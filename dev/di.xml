@@ -1,0 +1,477 @@
+<?xml version="1.0"?>
+
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <!-- Payment Method Facade configuration -->
+    <virtualType name="CsobPaymentGatewayFacade" type="Magento\Payment\Model\Method\Adapter">
+        <arguments>
+            <argument name="code" xsi:type="const">\Drmax\PaymentCsob\Model\Ui\ConfigProvider::CODE</argument>
+            <argument name="formBlockType" xsi:type="string">Magento\Payment\Block\Form</argument>
+            <argument name="infoBlockType" xsi:type="string">Drmax\PaymentCsob\Block\Info</argument>
+            <argument name="valueHandlerPool" xsi:type="object">CsobPaymentGatewayValueHandlerPool</argument>
+            <argument name="commandPool" xsi:type="object">CsobPaymentGatewayCommandPool</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Configuration reader -->
+    <virtualType name="CsobPaymentGatewayConfig" type="Magento\Payment\Gateway\Config\Config">
+        <arguments>
+            <argument name="methodCode" xsi:type="const">\Drmax\PaymentCsob\Model\Ui\ConfigProvider::CODE</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Custom Payment Logger - stripping out sensitive data -->
+    <virtualType name="CsobPaymentGatewayLogger" type="Magento\Payment\Model\Method\Logger">
+        <arguments>
+            <argument name="config" xsi:type="object">CsobPaymentGatewayConfig</argument>
+        </arguments>
+    </virtualType>
+    <type name="Drmax\PaymentCsob\Gateway\Http\Client\Curl">
+        <arguments>
+            <argument name="logger" xsi:type="object">CsobPaymentGatewayLogger</argument>
+            <argument name="converter" xsi:type="object">Drmax\PaymentCsob\Gateway\Http\Converter\JsonToArray</argument>
+        </arguments>
+    </type>
+
+    <!-- Commands POOL -->
+    <virtualType name="CsobPaymentGatewayCommandPool" type="Magento\Payment\Gateway\Command\CommandPool">
+        <arguments>
+            <argument name="commands" xsi:type="array">
+                <item name="initialize" xsi:type="string">CsobPaymentGatewayPaymentInitCommand</item>
+                <item name="process" xsi:type="string">CsobPaymentGatewayPaymentProcessCommand</item>
+                <item name="authorize" xsi:type="string">CsobPaymentGatewayPaymentAuthorizationCommand</item>
+                <item name="capture" xsi:type="string">CsobPaymentGatewayPaymentCaptureStrategyCommand</item>
+                <item name="close" xsi:type="string">CsobPaymentGatewayPaymentCloseCommand</item>
+                <item name="sale" xsi:type="string">CsobPaymentGatewayPaymentSaleCommand</item>
+                <item name="void" xsi:type="string">CsobPaymentGatewayPaymentReverseCommand</item>
+                <item name="refund" xsi:type="string">CsobPaymentGatewayPaymentRefundStrategyCommand</item>
+                <item name="refund_call" xsi:type="string">CsobPaymentGatewayPaymentRefundCommand</item>
+                <item name="status" xsi:type="string">CsobPaymentGatewayPaymentStatusCommand</item>
+                <item name="echo" xsi:type="string">CsobPaymentGatewayEchoCommand</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+
+    <!-- Echo Command -->
+    <virtualType name="CsobPaymentGatewayEchoCommand" type="Drmax\PaymentCsob\Gateway\Command\ResponseCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">CsobPaymentGatewayEchoDataBuilder</argument>
+            <argument name="transferFactory" xsi:type="object">CsobPaymentGatewayEchoTransferFactory</argument>
+            <argument name="client" xsi:type="object">Drmax\PaymentCsob\Gateway\Http\Client\Curl</argument>
+            <argument name="validator" xsi:type="object">CsobPaymentGatewayNoAuthCodeValidators</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Echo Builder -->
+    <virtualType name="CsobPaymentGatewayEchoDataBuilder" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="commonPart" xsi:type="string">Drmax\PaymentCsob\Gateway\Request\CommonParamsDataBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Echo Transfer Factory -->
+    <virtualType name="CsobPaymentGatewayEchoTransferFactory" type="Drmax\PaymentCsob\Gateway\Http\TransferFactory">
+        <arguments>
+            <argument name="mapper" xsi:type="object">Drmax\PaymentCsob\Gateway\Request\Mapper\EchoRequestMapper</argument>
+        </arguments>
+    </virtualType>
+
+
+    <!-- Payment Init Command -->
+    <virtualType name="CsobPaymentGatewayPaymentInitCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">CsobPaymentGatewayPaymentInitRequest</argument>
+            <argument name="transferFactory" xsi:type="object">CsobPaymentGatewayPaymentInitTransferFactory</argument>
+            <argument name="client" xsi:type="object">Drmax\PaymentCsob\Gateway\Http\Client\Curl</argument>
+            <argument name="validator" xsi:type="object">CsobPaymentGatewayBaseValidators</argument>
+            <argument name="handler" xsi:type="object">CsobPaymentGatewayInitResponseHandlerComposite</argument>
+            <argument name="errorMessageMapper" xsi:type="object">CsobPaymentGatewayErrorMapper\ErrorMessageMapperVirtual</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Payment Init Builder -->
+    <virtualType name="CsobPaymentGatewayPaymentInitRequest" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="commonPart" xsi:type="string">Drmax\PaymentCsob\Gateway\Request\CommonParamsDataBuilder</item>
+                <item name="transaction" xsi:type="string">Drmax\PaymentCsob\Gateway\Request\PaymentInitDataBuilder</item>
+                <item name="cartItems" xsi:type="string">Drmax\PaymentCsob\Gateway\Request\CartItemsDataBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+    <type name="Drmax\PaymentCsob\Gateway\Request\PaymentInitDataBuilder">
+        <arguments>
+            <argument name="config" xsi:type="object">CsobPaymentGatewayConfig</argument>
+        </arguments>
+    </type>
+
+    <!-- Payment Init Transfer Factory -->
+    <virtualType name="CsobPaymentGatewayPaymentInitTransferFactory" type="Drmax\PaymentCsob\Gateway\Http\TransferFactory">
+        <arguments>
+            <argument name="mapper" xsi:type="object">Drmax\PaymentCsob\Gateway\Request\Mapper\PaymentInitRequestMapper</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Payment Init Response handlers chain -->
+    <virtualType name="CsobPaymentGatewayInitResponseHandlerComposite" type="Magento\Payment\Gateway\Response\HandlerChain">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="payIdInit" xsi:type="string">Drmax\PaymentCsob\Gateway\Response\PayIdHandler</item>
+                <item name="txnId" xsi:type="string">Drmax\PaymentCsob\Gateway\Response\TxnIdHandler</item>
+                <item name="gatewayStatus" xsi:type="string">Drmax\PaymentCsob\Gateway\Response\PaymentStatusHandler</item>
+                <item name="paymentInitSpecific" xsi:type="string">Drmax\PaymentCsob\Gateway\Response\TransactionInitHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+
+    <!-- Payment Process Command -->
+    <virtualType name="CsobPaymentGatewayPaymentProcessCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">CsobPaymentGatewayPaymentProcessRequest</argument>
+            <argument name="transferFactory" xsi:type="object">CsobPaymentGatewayPaymentProcessTransferFactory</argument>
+            <argument name="client" xsi:type="object">Drmax\PaymentCsob\Gateway\Http\Client\Redirect</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Payment Process Builder -->
+    <virtualType name="CsobPaymentGatewayPaymentProcessRequest" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="commonPart" xsi:type="string">Drmax\PaymentCsob\Gateway\Request\CommonParamsDataBuilder</item>
+                <item name="transaction" xsi:type="string">Drmax\PaymentCsob\Gateway\Request\PaymentIdDataBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Payment Process Transfer Factory -->
+    <virtualType name="CsobPaymentGatewayPaymentProcessTransferFactory" type="Drmax\PaymentCsob\Gateway\Http\TransferFactory">
+        <arguments>
+            <argument name="mapper" xsi:type="object">Drmax\PaymentCsob\Gateway\Request\Mapper\PaymentProcessRequestMapper</argument>
+        </arguments>
+    </virtualType>
+
+
+    <!-- Payment - Authorize Command -->
+    <virtualType name="CsobPaymentGatewayPaymentAuthorizationCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">Drmax\PaymentCsob\Gateway\Request\ParamsPassingRequest</argument>
+            <argument name="transferFactory" xsi:type="object">Drmax\PaymentCsob\Gateway\Http\TransferFactoryLift</argument>
+            <argument name="client" xsi:type="object">Drmax\PaymentCsob\Gateway\Http\Client\InnerLoop</argument>
+            <argument name="validator" xsi:type="object">CsobPaymentGatewayBaseValidators</argument>
+            <argument name="handler" xsi:type="object">CsobPaymentGatewayTransactionResponseHandlerComposite</argument>
+            <argument name="errorMessageMapper" xsi:type="object">CsobPaymentGatewayErrorMapper\ErrorMessageMapperVirtual</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Payment - Sale Command -->
+    <virtualType name="CsobPaymentGatewayPaymentSaleCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">Drmax\PaymentCsob\Gateway\Request\ParamsPassingRequest</argument>
+            <argument name="transferFactory" xsi:type="object">Drmax\PaymentCsob\Gateway\Http\TransferFactoryLift</argument>
+            <argument name="client" xsi:type="object">Drmax\PaymentCsob\Gateway\Http\Client\InnerLoop</argument>
+            <argument name="validator" xsi:type="object">CsobPaymentGatewayBaseValidators</argument>
+            <argument name="handler" xsi:type="object">CsobPaymentGatewayTransactionResponseHandlerComposite</argument>
+            <argument name="errorMessageMapper" xsi:type="object">CsobPaymentGatewayErrorMapper\ErrorMessageMapperVirtual</argument>
+        </arguments>
+    </virtualType>
+
+
+    <!-- Payment Status Command -->
+    <virtualType name="CsobPaymentGatewayPaymentStatusCommand" type="Drmax\PaymentCsob\Gateway\Command\ResponseCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">CsobPaymentGatewayPaymentStatusRequest</argument>
+            <argument name="transferFactory" xsi:type="object">CsobPaymentGatewayPaymentStatusTransferFactory</argument>
+            <argument name="client" xsi:type="object">Drmax\PaymentCsob\Gateway\Http\Client\Curl</argument>
+            <argument name="validator" xsi:type="object">CsobPaymentGatewayBaseValidators</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Payment Status Builder -->
+    <virtualType name="CsobPaymentGatewayPaymentStatusRequest" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="commonPart" xsi:type="string">Drmax\PaymentCsob\Gateway\Request\CommonParamsDataBuilder</item>
+                <item name="transaction" xsi:type="string">Drmax\PaymentCsob\Gateway\Request\PaymentIdDataBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Payment Status Transfer Factory -->
+    <virtualType name="CsobPaymentGatewayPaymentStatusTransferFactory" type="Drmax\PaymentCsob\Gateway\Http\TransferFactory">
+        <arguments>
+            <argument name="mapper" xsi:type="object">Drmax\PaymentCsob\Gateway\Request\Mapper\PaymentStatusRequestMapper</argument>
+        </arguments>
+    </virtualType>
+
+
+    <!-- Payment Capture Strategy Command -->
+    <virtualType name="CsobPaymentGatewayPaymentCaptureStrategyCommand" type="Drmax\PaymentCsob\Gateway\Command\CaptureStrategyCommand">
+        <arguments>
+            <argument name="commandPool" xsi:type="object">CsobPaymentGatewayCommandPool</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Payment Close command -->
+    <virtualType name="CsobPaymentGatewayPaymentCloseCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">CsobPaymentGatewayPaymentCloseRequest</argument>
+            <argument name="transferFactory" xsi:type="object">CsobPaymentGatewayPaymentCloseTransferFactory</argument>
+            <argument name="client" xsi:type="object">Drmax\PaymentCsob\Gateway\Http\Client\Curl</argument>
+            <argument name="validator" xsi:type="object">CsobPaymentGatewayBaseValidators</argument>
+            <argument name="handler" xsi:type="object">CsobPaymentGatewayTransactionResponseHandlerComposite</argument>
+            <argument name="errorMessageMapper" xsi:type="object">CsobPaymentGatewayErrorMapper\ErrorMessageMapperVirtual</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Payment Close Builder -->
+    <virtualType name="CsobPaymentGatewayPaymentCloseRequest" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="commonPart" xsi:type="string">Drmax\PaymentCsob\Gateway\Request\CommonParamsDataBuilder</item>
+                <item name="transaction" xsi:type="string">Drmax\PaymentCsob\Gateway\Request\PaymentIdDataBuilder</item>
+                <item name="amount" xsi:type="string">Drmax\PaymentCsob\Gateway\Request\PaymentAmountCaptureDataBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Payment Close Transfer Factory -->
+    <virtualType name="CsobPaymentGatewayPaymentCloseTransferFactory" type="Drmax\PaymentCsob\Gateway\Http\TransferFactory">
+        <arguments>
+            <argument name="mapper" xsi:type="object">Drmax\PaymentCsob\Gateway\Request\Mapper\PaymentCloseRequestMapper</argument>
+        </arguments>
+    </virtualType>
+
+
+    <!-- Payment Reverse command -->
+    <virtualType name="CsobPaymentGatewayPaymentReverseCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">CsobPaymentGatewayPaymentReverseRequest</argument>
+            <argument name="transferFactory" xsi:type="object">CsobPaymentGatewayPaymentReverseTransferFactory</argument>
+            <argument name="client" xsi:type="object">Drmax\PaymentCsob\Gateway\Http\Client\Curl</argument>
+            <argument name="validator" xsi:type="object">CsobPaymentGatewayBaseValidators</argument>
+            <argument name="handler" xsi:type="object">CsobPaymentGatewayReverseResponseHandlerComposite</argument>
+            <argument name="errorMessageMapper" xsi:type="object">CsobPaymentGatewayErrorMapper\ErrorMessageMapperVirtual</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Payment Reverse Builder -->
+    <virtualType name="CsobPaymentGatewayPaymentReverseRequest" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="commonPart" xsi:type="string">Drmax\PaymentCsob\Gateway\Request\CommonParamsDataBuilder</item>
+                <item name="transaction" xsi:type="string">Drmax\PaymentCsob\Gateway\Request\PaymentIdDataBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Payment Reverse Transfer Factory -->
+    <virtualType name="CsobPaymentGatewayPaymentReverseTransferFactory" type="Drmax\PaymentCsob\Gateway\Http\TransferFactory">
+        <arguments>
+            <argument name="mapper" xsi:type="object">Drmax\PaymentCsob\Gateway\Request\Mapper\PaymentReverseRequestMapper</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Payment Reverse Response handlers chain -->
+    <virtualType name="CsobPaymentGatewayReverseResponseHandlerComposite" type="Magento\Payment\Gateway\Response\HandlerChain">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="generalTransactionCompositeHandlers" xsi:type="string">CsobPaymentGatewayTransactionResponseHandlerComposite</item>
+                <item name="txnVoid" xsi:type="string">Drmax\PaymentCsob\Gateway\Response\TransactionVoidHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+
+    <!-- Payment Refund Strategy Command -->
+    <virtualType name="CsobPaymentGatewayPaymentRefundStrategyCommand" type="Drmax\PaymentCsob\Gateway\Command\RefundStrategyCommand">
+        <arguments>
+            <argument name="commandPool" xsi:type="object">CsobPaymentGatewayCommandPool</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Payment Refund command -->
+    <virtualType name="CsobPaymentGatewayPaymentRefundCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">CsobPaymentGatewayPaymentRefundRequest</argument>
+            <argument name="transferFactory" xsi:type="object">CsobPaymentGatewayPaymentRefundTransferFactory</argument>
+            <argument name="client" xsi:type="object">Drmax\PaymentCsob\Gateway\Http\Client\Curl</argument>
+            <argument name="validator" xsi:type="object">CsobPaymentGatewayNoAuthCodeValidators</argument>
+            <argument name="handler" xsi:type="object">CsobPaymentGatewayTransactionResponseHandlerComposite</argument>
+            <argument name="errorMessageMapper" xsi:type="object">CsobPaymentGatewayErrorMapper\ErrorMessageMapperVirtual</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Payment Refund Builder -->
+    <virtualType name="CsobPaymentGatewayPaymentRefundRequest" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="commonPart" xsi:type="string">Drmax\PaymentCsob\Gateway\Request\CommonParamsDataBuilder</item>
+                <item name="transaction" xsi:type="string">Drmax\PaymentCsob\Gateway\Request\PaymentIdDataBuilder</item>
+                <item name="amount" xsi:type="string">Drmax\PaymentCsob\Gateway\Request\PaymentAmountRefundDataBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Payment Refund Transfer Factory -->
+    <virtualType name="CsobPaymentGatewayPaymentRefundTransferFactory" type="Drmax\PaymentCsob\Gateway\Http\TransferFactory">
+        <arguments>
+            <argument name="mapper" xsi:type="object">Drmax\PaymentCsob\Gateway\Request\Mapper\PaymentRefundRequestMapper</argument>
+        </arguments>
+    </virtualType>
+
+
+
+    <!-- Common params Data builder -->
+    <type name="Drmax\PaymentCsob\Gateway\Request\CommonParamsDataBuilder">
+        <arguments>
+            <argument name="config" xsi:type="object">CsobPaymentGatewayConfig</argument>
+        </arguments>
+    </type>
+
+    <!-- Payment Amount Data builders -->
+    <type name="Drmax\PaymentCsob\Gateway\Request\PaymentAmountCaptureDataBuilder">
+        <arguments>
+            <argument name="config" xsi:type="object">CsobPaymentGatewayConfig</argument>
+        </arguments>
+    </type>
+    <type name="Drmax\PaymentCsob\Gateway\Request\PaymentAmountRefundDataBuilder">
+        <arguments>
+            <argument name="config" xsi:type="object">CsobPaymentGatewayConfig</argument>
+        </arguments>
+    </type>
+
+
+
+
+    <!-- Value handlers infrastructure -->
+    <virtualType name="CsobPaymentGatewayValueHandlerPool" type="Magento\Payment\Gateway\Config\ValueHandlerPool">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="default" xsi:type="string">CsobPaymentGatewayConfigValueHandler</item>
+                <item name="can_initialize" xsi:type="string">Drmax\PaymentCsob\Gateway\Config\CanInitializeHandler</item>
+                <item name="can_void" xsi:type="string">Drmax\PaymentCsob\Gateway\Config\CanVoidHandler</item>
+                <item name="can_cancel" xsi:type="string">Drmax\PaymentCsob\Gateway\Config\CanVoidHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="CsobPaymentGatewayConfigValueHandler" type="Magento\Payment\Gateway\Config\ConfigValueHandler">
+        <arguments>
+            <argument name="configInterface" xsi:type="object">CsobPaymentGatewayConfig</argument>
+        </arguments>
+    </virtualType>
+
+
+    <!-- Validator chains -->
+    <virtualType name="CsobPaymentGatewayBaseValidators" type="Magento\Payment\Gateway\Validator\ValidatorComposite">
+        <arguments>
+            <argument name="validators" xsi:type="array">
+                <item name="signature" xsi:type="string">Drmax\PaymentCsob\Gateway\Validator\SignatureValidator</item>
+                <item name="resultCode" xsi:type="string">Drmax\PaymentCsob\Gateway\Validator\ResponseCodeValidator</item>
+                <item name="authCode" xsi:type="string">Drmax\PaymentCsob\Gateway\Validator\AuthCodeValidator</item>
+            </argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="CsobPaymentGatewayNoAuthCodeValidators" type="Magento\Payment\Gateway\Validator\ValidatorComposite">
+        <arguments>
+            <argument name="validators" xsi:type="array">
+                <item name="signature" xsi:type="string">Drmax\PaymentCsob\Gateway\Validator\SignatureValidator</item>
+                <item name="resultCode" xsi:type="string">Drmax\PaymentCsob\Gateway\Validator\ResponseCodeValidator</item>
+            </argument>
+        </arguments>
+    </virtualType>
+    <type name="Drmax\PaymentCsob\Gateway\Validator\SignatureValidator">
+        <arguments>
+            <argument name="mapper" xsi:type="object">Drmax\PaymentCsob\Gateway\Response\Mapper\GeneralResponseMapper</argument>
+        </arguments>
+    </type>
+
+
+    <!-- Error codes mapper -->
+    <virtualType name="CsobPaymentGatewayErrorMapper\ConfigReaderVirtual" type="Magento\Payment\Gateway\ErrorMapper\VirtualConfigReader">
+        <arguments>
+            <argument name="fileName" xsi:type="string">csob_payment_error_mapping.xml</argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="CsobPaymentGatewayErrorMapper\MappingDataVirtual" type="Magento\Payment\Gateway\ErrorMapper\MappingData">
+        <arguments>
+            <argument name="reader" xsi:type="object">CsobPaymentGatewayErrorMapper\ConfigReaderVirtual</argument>
+            <argument name="cacheId" xsi:type="string">csob_payment_error_mapper</argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="CsobPaymentGatewayErrorMapper\ErrorMessageMapperVirtual" type="Magento\Payment\Gateway\ErrorMapper\ErrorMessageMapper">
+        <arguments>
+            <argument name="messageMapping" xsi:type="object">CsobPaymentGatewayErrorMapper\MappingDataVirtual</argument>
+        </arguments>
+    </virtualType>
+
+
+    <!-- General Transaction Payment Response handlers chain -->
+    <virtualType name="CsobPaymentGatewayTransactionResponseHandlerComposite" type="Magento\Payment\Gateway\Response\HandlerChain">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="txnId" xsi:type="string">Drmax\PaymentCsob\Gateway\Response\TxnIdHandler</item>
+                <item name="gatewayStatus" xsi:type="string">Drmax\PaymentCsob\Gateway\Response\PaymentStatusHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+
+
+    <!-- Config interface assignments -->
+    <type name="Drmax\PaymentCsob\Block\Info">
+        <arguments>
+            <argument name="config" xsi:type="object">CsobPaymentGatewayConfig</argument>
+        </arguments>
+    </type>
+
+    <type name="Drmax\PaymentCsob\Controller\Callback\Response">
+        <arguments>
+            <argument name="config" xsi:type="object">CsobPaymentGatewayConfig</argument>
+        </arguments>
+    </type>
+    <type name="Drmax\PaymentCsob\Gateway\Http\TransferFactory">
+        <arguments>
+            <argument name="config" xsi:type="object">CsobPaymentGatewayConfig</argument>
+        </arguments>
+    </type>
+    <type name="Drmax\PaymentCsob\Gateway\Signature\Sign">
+        <arguments>
+            <argument name="config" xsi:type="object">CsobPaymentGatewayConfig</argument>
+        </arguments>
+    </type>
+    <type name="Drmax\PaymentCsob\Gateway\Signature\Verify">
+        <arguments>
+            <argument name="config" xsi:type="object">CsobPaymentGatewayConfig</argument>
+        </arguments>
+    </type>
+    <type name="Drmax\PaymentCsob\Gateway\Signature\Keys">
+        <arguments>
+            <argument name="config" xsi:type="object">CsobPaymentGatewayConfig</argument>
+        </arguments>
+    </type>
+
+    <!-- Controllers CommandPools -->
+    <type name="Drmax\PaymentCsob\Controller\Check\Alive">
+        <arguments>
+            <argument name="commandPool" xsi:type="object">CsobPaymentGatewayCommandPool</argument>
+        </arguments>
+    </type>
+    <type name="Drmax\PaymentCsob\Controller\Check\Status">
+        <arguments>
+            <argument name="commandPool" xsi:type="object">CsobPaymentGatewayCommandPool</argument>
+        </arguments>
+    </type>
+    <type name="Drmax\PaymentCsob\Controller\Sandbox\Payment">
+        <arguments>
+            <argument name="commandPool" xsi:type="object">CsobPaymentGatewayCommandPool</argument>
+        </arguments>
+    </type>
+    <type name="Drmax\PaymentCsob\Controller\Redirect\Process">
+        <arguments>
+            <argument name="commandPool" xsi:type="object">CsobPaymentGatewayCommandPool</argument>
+        </arguments>
+    </type>
+</config>
