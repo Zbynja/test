@@ -124,6 +124,7 @@ class Process extends \Magento\Framework\App\Action\Action
                 'orderEntityId' => $orderEntityId,
                 'orderIncrementId' => $orderIncrementId
             ];
+print_r($logContext);die;
 
             if (!$this->order || !$this->order->getEntityId()) {
                 $this->logger->error(self::LOGGER_PREFIX . 'no order loaded', $logContext);
@@ -154,12 +155,13 @@ class Process extends \Magento\Framework\App\Action\Action
             }
             $logContext = ['quote ID' => $quoteId];
             $this->logger->debug(self::LOGGER_PREFIX . 'loading quote by its ID', $logContext);
+    print_r($logContext);
 
             $quote = $this->quoteFactory->create()->loadByIdWithoutStore($quoteId);
             if ($quote->getId() && $quote->getReservedOrderId()){
                 $logContext['Order ID'] = $quote->getReservedOrderId();
                 $this->logger->debug(self::LOGGER_PREFIX . 'quote loaded', $logContext);
-
+print_r($logContext);
                 return $quote->getReservedOrderId();
 
             } else {
