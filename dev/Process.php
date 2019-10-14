@@ -83,7 +83,6 @@ class Process extends \Magento\Framework\App\Action\Action
      */
     public function execute()
     {
-echo 'test';die;
         $order = $this->getOrder();
         $payment = $order->getPayment();
 
